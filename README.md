@@ -1,2 +1,2 @@
 # tetriobot
-a bot made for tetrio
+a bot made for tetrio using coldclear
