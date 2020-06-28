@@ -707,7 +707,7 @@ namespace tetriobrowser
 
                     //Console.WriteLine("status: " + hold + "\n" + playing + "\n" + gamelocked + "\n" + combo + "\n" + b2b + "\n" + upcomingGb);
 
-                
+                //
 
             }
         }
