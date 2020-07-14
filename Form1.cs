@@ -15,6 +15,10 @@ using System.Xml;
 using System.Diagnostics;
 using ColdClear;
 using System.Threading;
+using CefSharp.Handler;
+using System.IO;
+using System.Reflection;
+using System.Net;
 
 namespace tetriobrowser
 {
@@ -35,6 +39,7 @@ namespace tetriobrowser
         public static string[] stringPieces;
         public static CCPiece[] CCpieces;
         public static bool initCC;
+        Form2 overlay;
 
        
         bool devTools = false;
@@ -45,15 +50,18 @@ namespace tetriobrowser
             Init();
             textBox1.Text = "100";
             textBox2.Text = "40";
-            
+            //string path = System.Reflection.Assembly.GetExecutingAssembly().Location;
+            string path = Path.Combine("file:///" + Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), "test.js");
+
+            textBox3.Text = path;
             KeyboardIntercept keyboardIntercept = new KeyboardIntercept();
             keyboardIntercept.KeyIntercepted += new EventHandler<KeyEventArgs>(Form1_KeyDown);
-            
+            textBox4.Text = pixelSize.ToString();
             
             //InitCC();
             timer1.Start();
         }
-
+        
         private void webBrowser1_DocumentCompleted(object sender, WebBrowserDocumentCompletedEventArgs e)
         {
 
@@ -75,17 +83,23 @@ namespace tetriobrowser
             gamelocked = true;
             playing = false;
             isRunning = false;
+            plannedLocations2 = new string[40, 10];
             Console.WriteLine("disablingprogram");
         }
         private void Init() {
             gamelocked = true;
             playing = false;
-
+           overlay = new Form2();
+            //overlay.Show();
             CefSettings settings = new CefSettings();
             settings.CachePath = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData) + @"\CEF";
 
             Cef.Initialize(settings);
             chromeBrowser = new ChromiumWebBrowser("https://tetr.io");
+            //chromeBrowser.RequestHandler = new CustomRequestHandler(); 
+            //var x = new RequestContext();
+
+            //Controls.Add(browser);
             this.panel1.Controls.Add(chromeBrowser);
             chromeBrowser.Dock = DockStyle.Fill;
             chromeBrowser.IsBrowserInitializedChanged += ChromeBrowser_IsBrowserInitializedChanged;
@@ -113,27 +127,30 @@ namespace tetriobrowser
         }
         static bool misdropdetect(MovePlans mp)
         {
+            /*
+           */
+            if (!(trainerOn))
+            {
                 int count = 0;
                 var plan = mp.Plans[0];
-               
+
                 for (int j = 0; j < 4; j++)
                 {
                     int cl = plan.ClearedLines[j];
                     if (cl == -1)
                     {
-                    count++;
-                    } 
-                   
-                }
-                if(count != 4)
-            {
-                return false;
-            }
-               
+                        count++;
+                    }
 
-            
-            
-            for(int i = 0; i < 4; i++)
+                }
+                if (count != 4)
+                {
+                    return false;
+                }
+            }
+
+
+            for (int i = 0; i < 4; i++)
             {
                 if(ccArray[mp.Move.ExpectedY[i], mp.Move.ExpectedX[i]] == true)
                 {
@@ -148,6 +165,9 @@ namespace tetriobrowser
             return false;
 
         }
+        public static bool[,] plannedLocations = new bool[40, 10];
+        public static string[,] plannedLocations2 = new string[40, 10];
+
         private void setLabel1TextSafe(string txt)
         {
             if (richTextBox1.InvokeRequired)
@@ -155,9 +175,23 @@ namespace tetriobrowser
             else
                 richTextBox1.Text = txt;
         }
+        private void setLabel9TextSafe(string txt)
+        {
+            if (label9.InvokeRequired)
+                label9.Invoke(new Action(() => label9.Text = txt));
+            else
+                label9.Text = txt;
+        }
         public static bool lineclear = false;
         public void PrintMovePlan(MovePlans mp)
         {
+            for(int i = 0; i < 40; i++)
+            {
+                for(int x = 0; x < 10; x++)
+                {
+                    plannedLocations2[i,x] = "";
+                }
+            }
             string report = "";
             Console.WriteLine($"Node: {mp.Move.Nodes}, Depth: {mp.Move.Depth}, Rank: {mp.Move.OriginalRank}");
             report += $"\nNode: {mp.Move.Nodes}, Depth: {mp.Move.Depth}, Rank: {mp.Move.OriginalRank}";
@@ -172,14 +206,35 @@ namespace tetriobrowser
             report += $"\nUseHold: {mp.Move.Hold}";
             report += $"\nLocation: {GetLocation(mp.Move.ExpectedX, mp.Move.ExpectedY)}";
             Console.WriteLine($"Location: {GetLocation(mp.Move.ExpectedX, mp.Move.ExpectedY)}");
+            /*for (int i = 0; i < 4; i++)
+            {
+                plannedLocations2[mp.Move.ExpectedY[i], mp.Move.ExpectedX[i]] = mp.P;
 
+            }*/
             Console.WriteLine($"Plans: {mp.Plans.Length}");
+            int id = 0;
             foreach (var plan in mp.Plans)
             {
                 Console.WriteLine($"Piece: {plan.Piece}, Tspin: {plan.TSpin}");
                 report += $"\nPiece: {plan.Piece}, Tspin: {plan.TSpin}";
                 report += $"\nLocation: {GetLocation(plan.ExpectedX, plan.ExpectedY)}";
                 Console.WriteLine($"Location: {GetLocation(plan.ExpectedX, plan.ExpectedY)}");
+                if (id == 0 )
+                {
+                    for (int i = 0; i < 4; i++)
+                    {
+                        if(id == 0)
+                        {
+                            plannedLocations2[plan.ExpectedY[i], plan.ExpectedX[i]] = "current";
+                            continue;
+
+
+                        }
+                        plannedLocations2[plan.ExpectedY[i], plan.ExpectedX[i]] = plan.Piece.ToString().Replace("CC_", "");
+
+                    }
+                }
+                
                 for (int j = 0; j < 4; j++)
                 {
                     int cl = plan.ClearedLines[j];
@@ -190,6 +245,8 @@ namespace tetriobrowser
                     report += $"\nCleared line: {cl}";
                     Console.WriteLine($"Cleared line: {cl}");
                 }
+                id++;
+
             }
             setLabel1TextSafe(report);
 
@@ -221,11 +278,11 @@ namespace tetriobrowser
                 var options = CCOptions.Default();
                  options.pcloop = false;
                 options.spawn_rule = CCSpawnRule.CC_ROW_21_AND_FALL;
-                options.threads = 2;
+                options.threads = 3;
                 //options.min_nodes = 10;
-                options.max_nodes = 500000;
+                options.max_nodes = 1000000;
                 options.speculate = speculation;
-                //options.spawn_rule = CC_20G;
+                //options.mode = CCMovementMode.CC_HARD_DROP_ONLY
                 var weights = CCWeights.Default();
                 if (pcpriority)
                 {
@@ -323,12 +380,73 @@ namespace tetriobrowser
                             MovePlans mp = cc.GetNextMoveAndPlans(upcomingGb);
                             int lol = upcomingGb;
                             PrintMovePlan(mp);
+                            
                             Console.WriteLine("placing \n");
 
+                            if (piece2piece)
+                            {
+                                Task h = getPiecesPlaced();
+                                h.Wait();
+                                int pieceplaceholder = botpcplaced;
+                                if (mp.Move.Hold)
+                                {
+                                    Keypresses.HoldPiece();
+                                }
+                                while (botpcplaced >= p2pcplaced)
+                                {
+                                    
+                                   
+                                    Task h2 = getPiecesPlaced();
+                                    h2.Wait();
+                                    Thread.Sleep(10);
+                                    Console.WriteLine(botpcplaced + " vs player - " + p2pcplaced);
+                                    if(botpcplaced > pieceplaceholder)
+                                    {
+                                        goto end_of_loop;
+                                    }
+                                }
+                                Console.WriteLine(botpcplaced + " vs player - " + p2pcplaced + ":: executing moves");
+                                executeMoves(mp.Move);
+                            }
+                            else if(trainerOn)
+                            {
+                                overlay.setMatrix(RotateMatrixCounterClockwiseString(RotateMatrixCounterClockwiseString(RotateMatrixCounterClockwiseString(plannedLocations2))));
+                                overlay.Invalidate();
+                                if (mp.Move.Hold)
+                                {
+                                    Thread.Sleep(1);
+                                    Keypresses.HoldPiece();
+                                }
+                                Task h2 = getPiecesPlaced();
+                                h2.Wait();
+                                int pieceplaceholder = botpcplaced;
+                                while(botpcplaced == pieceplaceholder)
+                                {
+                                    Task h3 = getPiecesPlaced();
+                                    h3.Wait();
+                                    Thread.Sleep(10);
+                                    
+                                }
+                                
+                            }
+                            else
+                            {
+                                executeMoves(mp.Move);
 
-                            executeMoves(mp.Move);
+                            }
+                            //setLabel9TextSafe(Print2DArray(FlipArrayString(RotateMatrixCounterClockwiseString(RotateMatrixCounterClockwiseString(plannedLocations2)))));
+                            end_of_loop:
+                            int delay2 = 0;
+                            if (legitmode)
+                            {
+                                Random rnd = new Random();
+                                delay2 = rnd.Next(0, delay);
 
-                            Thread.Sleep(delay);
+                            } else
+                            {
+                                delay2 = delay;
+                            }
+                            Thread.Sleep(delay2);
                             Task t5 = getData();
                             t5.Wait();
 
@@ -376,23 +494,23 @@ namespace tetriobrowser
                 return false;
             }
         }
-        public static string Print2DArray(bool[,] smth)
+        public static string Print2DArray(string[,] smth)
         {
-            bool[,] matrix = smth;
+            string[,] matrix = new string[40,10];
             string lol = "";
             for (int i = 0; i < 40; i++)
             {
                 //lol += matrix[i, j] + "\t";
                 for (int j = 0; j < 10; j++)
                 {
-                    if (matrix[i, j])
+                    if (!(String.IsNullOrEmpty(smth[i, j])))
                     {
-                        lol += 1;
+                        lol += smth[i, j];
 
                     }
                     else
                     {
-                        lol += 0;
+                        lol += " ";
                     }
                 }
                 lol += "\n";
@@ -435,6 +553,24 @@ namespace tetriobrowser
             }
             return newMatrix;
         }
+
+        public static string[,] RotateMatrixCounterClockwiseString(string[,] oldMatrix)
+        {
+            string[,] newMatrix = new string[oldMatrix.GetLength(1), oldMatrix.GetLength(0)];
+            int newColumn, newRow = 0;
+            for (int oldColumn = oldMatrix.GetLength(1) - 1; oldColumn >= 0; oldColumn--)
+            {
+                newColumn = 0;
+                for (int oldRow = 0; oldRow < oldMatrix.GetLength(0); oldRow++)
+                {
+                    newMatrix[newRow, newColumn] = oldMatrix[oldRow, oldColumn];
+                    newColumn++;
+                }
+                newRow++;
+            }
+            return newMatrix;
+        }
+
         public static bool[,] FlipArray(bool[,] tetrisField)
         {
             bool[,] arrayToFlip = tetrisField;
@@ -454,7 +590,25 @@ namespace tetriobrowser
             }
             return flippedArray;
         }
+        public static string[,] FlipArrayString(string[,] tetrisField)
+        {
+            string[,] arrayToFlip = tetrisField;
+            int rows = arrayToFlip.GetLength(0);
+            int columns = arrayToFlip.GetLength(1);
+            string[,] flippedArray = new string[rows, columns];
+            string temp;
+            for (int i = 0; i < rows; i++)
+            {
+                for (int j = 0; j < columns; j++)
+                {
+                    temp = arrayToFlip[i, j];
 
+                    flippedArray[i, j] = arrayToFlip[i, columns - j - 1];
+                    flippedArray[i, columns - j - 1] = temp;
+                }
+            }
+            return flippedArray;
+        }
         public static CCPiece convertStringToCC(string a)
         {
             switch (a.ToUpper())
@@ -576,11 +730,35 @@ namespace tetriobrowser
 
             }
         }
+        public static int botpcplaced = 0;
+        public static int p2pcplaced = 0;
+        private async Task getPiecesPlaced()
+        {
+                if (chromeBrowser.CanExecuteJavascriptInMainFrame)
+            {
+                JavascriptResponse piecesPlaced = await chromeBrowser.EvaluateScriptAsync("otherPlayer.export().stats.piecesplaced.toString();");
+                if (piecesPlaced.Result != null)
+                {
+                    
+                    int piecesplacednum = Int16.Parse(piecesPlaced.Result.ToString());
+                    p2pcplaced = piecesplacednum;
+                }
+                JavascriptResponse piecesPlaced2 = await chromeBrowser.EvaluateScriptAsync("lol.export().stats.piecesplaced.toString();");
+                if (piecesPlaced2.Result != null)
+                {
+                    //string pieces = piecesPlaced2.Result.ToString();
+                    int piecesplacednum = Int16.Parse(piecesPlaced2.Result.ToString());
+                    botpcplaced = piecesplacednum;
+                }
+
+            }
+        }
+
         private async Task getBag()
         {
             if (chromeBrowser.CanExecuteJavascriptInMainFrame)
             {
-                JavascriptResponse bag = await chromeBrowser.EvaluateScriptAsync("bagArray.toString();");
+                JavascriptResponse bag = await chromeBrowser.EvaluateScriptAsync("lol.getFirstBag().toString();");
                 if (bag.Result != null)
                 {
                     string jaa = bag.Result.ToString();
@@ -838,5 +1016,83 @@ namespace tetriobrowser
                     };
             Console.WriteLine(pcpriority);
         }
+
+        public static bool piece2piece = false;
+        private void checkBox4_CheckedChanged(object sender, EventArgs e)
+        {
+            if (piece2piece)
+            {
+                piece2piece = false;
+            }
+            else
+            {
+                piece2piece = true;
+            }
+        }
+        public static bool trainerOn = false;
+        public static int pixelSize = 32;
+
+        private void checkBox5_CheckedChanged(object sender, EventArgs e)
+        {
+            if (trainerOn)
+            {
+                trainerOn = false;
+                overlay.Hide();
+            }
+            else
+            {
+                trainerOn = true;
+                overlay.Show();
+            }
+            if (!(Int32.TryParse(textBox4.Text, out pixelSize)))
+            {
+                MessageBox.Show("Wrong value input.");
+
+            }
+            else
+            {
+                overlay.Invalidate();
+
+            }
+        }
     }
+
+    public class CustomResourceRequestHandler : ResourceRequestHandler
+    {
+       
+        protected override CefReturnValue OnBeforeResourceLoad(IWebBrowser chromiumWebBrowser, IBrowser browser, IFrame frame, IRequest request, IRequestCallback callback)
+        {
+            string path = Path.Combine("file:///" + Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), "test.js");
+
+            string originalUrl = request.Url;
+            if (request.Url.Contains("tetrio.js"))
+            {
+                Console.WriteLine("fileserver.com: " + request.Url);
+                Console.WriteLine(path);
+
+                string filename = path;
+                // e.g. http://fileserver.com/abc.png = abc.png
+                //request.
+                // We want to use the files from myfileserver.com instead
+                //request.Url = "file:///C:/Users/nuvas/source/repos/tetriobot/bin/x64/Release/test.js";
+
+                //request.
+                //return new FlashResourceHandler();
+            }
+
+            callback.Dispose();
+            return CefReturnValue.Continue;
+        }
+    }
+    public class CustomRequestHandler : RequestHandler
+    {
+        protected override IResourceRequestHandler GetResourceRequestHandler(IWebBrowser chromiumWebBrowser, IBrowser browser, IFrame frame, IRequest request, bool isNavigation, bool isDownload, string requestInitiator, ref bool disableDefaultHandling)
+        {
+            return new CustomResourceRequestHandler();
+        }
+    }
+
+   
+
+
 }

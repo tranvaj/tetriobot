@@ -30,7 +30,7 @@ namespace tetriobrowser
 
                 dice = rnd.Next(25, 80); // creates a number between 1 and 5
                 delay = rnd.Next(30,50);
-                delay2 = rnd.Next(0, 100);
+                delay2 = rnd.Next(0, 400);
             }
             else
             {
@@ -66,14 +66,17 @@ namespace tetriobrowser
                         continue;
                 }
 
-                Thread.Sleep(dice);
+                //Thread.Sleep(dice);
             }
             
-            Thread.Sleep(delay2);
+            //Thread.Sleep(delay2);
             SendDrop();
 
 
         }
+
+
+
         public static void SendRight()
         {
 
