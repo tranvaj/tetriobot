@@ -59,7 +59,7 @@ namespace tetriobrowser
             textBox4.Text = pixelSize.ToString();
             
             //InitCC();
-            timer1.Start();
+            //timer1.Start();
         }
         
         private void webBrowser1_DocumentCompleted(object sender, WebBrowserDocumentCompletedEventArgs e)
@@ -84,6 +84,9 @@ namespace tetriobrowser
             playing = false;
             isRunning = false;
             plannedLocations2 = new string[40, 10];
+            botpcplaced = 0;
+            p2pcplaced = 0;
+            //timer1.Stop();
             Console.WriteLine("disablingprogram");
         }
         private void Init() {
@@ -92,6 +95,8 @@ namespace tetriobrowser
            overlay = new Form2();
             //overlay.Show();
             CefSettings settings = new CefSettings();
+            
+            //settings.LogSeverity = LogSeverity.Disable;
             settings.CachePath = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData) + @"\CEF";
 
             Cef.Initialize(settings);
@@ -125,10 +130,8 @@ namespace tetriobrowser
         {
             return $"{x[0]},{y[0]} {x[1]},{y[1]} {x[2]},{y[2]} {x[3]},{y[3]}";
         }
-        static bool misdropdetect(MovePlans mp)
+        public  bool misdropdetect(MovePlans mp)
         {
-            /*
-           */
             if (!(trainerOn))
             {
                 int count = 0;
@@ -148,20 +151,29 @@ namespace tetriobrowser
                     return false;
                 }
             }
+                
+            
 
-
+            //int cd = 0;
             for (int i = 0; i < 4; i++)
             {
+                
                 if(ccArray[mp.Move.ExpectedY[i], mp.Move.ExpectedX[i]] == true)
                 {
+                    //cd++;
+                    //setLabel11TextSafe(Print2DArraybool(ccArray));
+                    //return false;
                 }
                 else
                 {
                     Console.WriteLine($"misdrop - not filled: {mp.Move.ExpectedY[i]}, {mp.Move.ExpectedX[i]}");
+                    setLabel8TextSafe("misdrop");
                     return true;
                     
                 }
             }
+            //setLabel10TextSafe(cd.ToString());
+
             return false;
 
         }
@@ -175,12 +187,26 @@ namespace tetriobrowser
             else
                 richTextBox1.Text = txt;
         }
-        private void setLabel9TextSafe(string txt)
+        private void setLabel8TextSafe(string txt)
         {
-            if (label9.InvokeRequired)
-                label9.Invoke(new Action(() => label9.Text = txt));
+            if (label8.InvokeRequired)
+                label8.Invoke(new Action(() => label8.Text = txt));
             else
-                label9.Text = txt;
+                label8.Text = txt;
+        }
+        private void setLabel11TextSafe(string txt)
+        {
+            if (label1.InvokeRequired)
+                label1.Invoke(new Action(() => label1.Text = txt));
+            else
+                label1.Text = txt;
+        }
+        private void setLabel10TextSafe(string txt)
+        {
+            if (label10.InvokeRequired)
+                label10.Invoke(new Action(() => label10.Text = txt));
+            else
+                label10.Text = txt;
         }
         public static bool lineclear = false;
         public void PrintMovePlan(MovePlans mp)
@@ -219,7 +245,7 @@ namespace tetriobrowser
                 report += $"\nPiece: {plan.Piece}, Tspin: {plan.TSpin}";
                 report += $"\nLocation: {GetLocation(plan.ExpectedX, plan.ExpectedY)}";
                 Console.WriteLine($"Location: {GetLocation(plan.ExpectedX, plan.ExpectedY)}");
-                if (id == 0 )
+                if (id <= 1)
                 {
                     for (int i = 0; i < 4; i++)
                     {
@@ -230,6 +256,7 @@ namespace tetriobrowser
 
 
                         }
+                        
                         plannedLocations2[plan.ExpectedY[i], plan.ExpectedX[i]] = plan.Piece.ToString().Replace("CC_", "");
 
                     }
@@ -269,7 +296,7 @@ namespace tetriobrowser
                     MessageBox.Show("Wrong value input.");
 
                 }
-                Task t = getBag();
+                Task t = getbagrewrite();
                 t.Wait();
                 
                 //label5.Text = "started";
@@ -278,23 +305,27 @@ namespace tetriobrowser
                 var options = CCOptions.Default();
                  options.pcloop = false;
                 options.spawn_rule = CCSpawnRule.CC_ROW_21_AND_FALL;
-                options.threads = 3;
+                options.threads = 2;
                 //options.min_nodes = 10;
-                options.max_nodes = 1000000;
+                options.max_nodes = 500000;
                 options.speculate = speculation;
                 //options.mode = CCMovementMode.CC_HARD_DROP_ONLY
                 var weights = CCWeights.Default();
+                weights.perfect_clear = 100;
                 if (pcpriority)
                 {
-                    weights.perfect_clear = 10000;
+                    weights.perfect_clear = 999;
                     options.pcloop = true;
                 }
+                weights.combo_garbage = 300;
                 //NextGenerator g = new NextGenerator();
                 CCPieceBag bag = CCPieceBag.Full();
                 Task t3;
                 t3 = getData();
                 t3.Wait();
                 Console.WriteLine("starting");
+                //timer1.Start();
+
 
                 //cc = new Bot(options, weights, Converter(ccArray), bag, hold, hasBtb(b2b), combo);
                 using (var cc = new Bot(options, weights, Converter(ccArray), bag, hold, hasBtb(b2b), combo)) {
@@ -306,6 +337,7 @@ namespace tetriobrowser
                     }
                     while (true)
                     {
+                        int pieceplaceholder = 0;
                         Task gameover_check = gameoverCheck();
                         gameover_check.Wait();
                         //Task t2 = getBag();
@@ -324,7 +356,13 @@ namespace tetriobrowser
                             Console.WriteLine("stopped");
                             return;
                         }
-                        Task t2 = getFutureBag();
+                        if (trainerOn)
+                        {
+                            Task h2 = getPiecesPlacedBot();
+                            h2.Wait();
+                            pieceplaceholder = botpcplaced;
+                        }
+                        /*Task t2 = getFutureBag();
                         t2.Wait();
                         if (addPieces)
                         {
@@ -335,7 +373,25 @@ namespace tetriobrowser
                                 Console.WriteLine(CCpieces[i].ToString());
 
                             }
+                        }*/
+                        Task t23 = overlimitbag();
+                        t23.Wait();
+                        if (!overlimit)
+                        {
+                            Task t22 = generatebag();
+                            t22.Wait();
+
+
+                            for (int i = 0; i < generatedbag.Length; i++)
+                            {
+                                cc.AddNextPiece(generatedbag[i]);
+                                Console.WriteLine(generatedbag[i].ToString());
+
+                            }
                         }
+                        Console.WriteLine("overlimit: " + overlimit);
+
+                        //CCpieces = generatedbag;
 
                         /*if (!(CCpieces.SequenceEqual(CCpieces2)))
                         {
@@ -349,7 +405,7 @@ namespace tetriobrowser
                             }
                         }*/
 
-                        CCpieces2 = CCpieces;
+                        //CCpieces2 = CCpieces;
 
                         /*if (initCC)
                         {
@@ -379,23 +435,44 @@ namespace tetriobrowser
                             upcomingTsk.Wait();
                             MovePlans mp = cc.GetNextMoveAndPlans(upcomingGb);
                             int lol = upcomingGb;
+                            
                             PrintMovePlan(mp);
                             
                             Console.WriteLine("placing \n");
+                            int totalblocks = 0;
+                            int totalblocks2 = 0;
+                            foreach (var x in ccArray)
+                            {
+                                if (x)
+                                {
+                                    totalblocks++;
+                                }
+                            }
+
 
                             if (piece2piece)
                             {
                                 Task h = getPiecesPlaced();
                                 h.Wait();
-                                int pieceplaceholder = botpcplaced;
+                                pieceplaceholder = botpcplaced;
                                 if (mp.Move.Hold)
                                 {
                                     Keypresses.HoldPiece();
                                 }
                                 while (botpcplaced >= p2pcplaced)
                                 {
-                                    
-                                   
+
+                                    if (gameover)
+                                    {
+                                        DisableProgram();
+                                        return;
+                                    }
+                                    if (stop)
+                                    {
+                                        DisableProgram();
+                                        Console.WriteLine("stopped");
+                                        return;
+                                    }
                                     Task h2 = getPiecesPlaced();
                                     h2.Wait();
                                     Thread.Sleep(10);
@@ -410,30 +487,46 @@ namespace tetriobrowser
                             }
                             else if(trainerOn)
                             {
-                                overlay.setMatrix(RotateMatrixCounterClockwiseString(RotateMatrixCounterClockwiseString(RotateMatrixCounterClockwiseString(plannedLocations2))));
-                                overlay.Invalidate();
                                 if (mp.Move.Hold)
                                 {
-                                    Thread.Sleep(1);
+
                                     Keypresses.HoldPiece();
                                 }
-                                Task h2 = getPiecesPlaced();
-                                h2.Wait();
-                                int pieceplaceholder = botpcplaced;
-                                while(botpcplaced == pieceplaceholder)
+                                overlay.setMatrix(RotateMatrixCounterClockwiseString(RotateMatrixCounterClockwiseString(RotateMatrixCounterClockwiseString(plannedLocations2))));
+                                overlay.Invalidate();
+
+                                
+                                
+                                while (botpcplaced != (pieceplaceholder + 1) )
                                 {
-                                    Task h3 = getPiecesPlaced();
+                                    Task h3 = getPiecesPlacedBot();
                                     h3.Wait();
-                                    Thread.Sleep(10);
-                                    
+                                    Thread.Sleep(40);
+                                    if (gameover)
+                                    {
+                                        DisableProgram();
+                                        return;
+                                    }
+                                    if (stop)
+                                    {
+                                        DisableProgram();
+                                        Console.WriteLine("stopped");
+                                        return;
+                                    }
+
                                 }
                                 
                             }
                             else
                             {
+                                //overlay.setMatrix(RotateMatrixCounterClockwiseString(RotateMatrixCounterClockwiseString(RotateMatrixCounterClockwiseString(plannedLocations2))));
+                                //overlay.Invalidate();
                                 executeMoves(mp.Move);
 
                             }
+
+                            
+
                             //setLabel9TextSafe(Print2DArray(FlipArrayString(RotateMatrixCounterClockwiseString(RotateMatrixCounterClockwiseString(plannedLocations2)))));
                             end_of_loop:
                             int delay2 = 0;
@@ -446,17 +539,28 @@ namespace tetriobrowser
                             {
                                 delay2 = delay;
                             }
-                            Thread.Sleep(delay2);
+                            Thread.Sleep(delay2+10);
                             Task t5 = getData();
                             t5.Wait();
-
-                            if (lol > 0 || misdropdetect(mp))
+                            foreach (var x in ccArray)
                             {
-                                Console.WriteLine($"misdrop or garbage received: {lol}");
+                                if (x)
+                                {
+                                    totalblocks2++;
+                                }
+                            }
+                            if (lol > 0 || misdropdetect(mp) || totalblocks2 > (totalblocks + 4))
+                            {
+                                //lol = false;
+                                Console.WriteLine($"misdrop or garbage received: ");
+                                setLabel8TextSafe("MISDROP");
                                 cc.Reset(Converter(ccArray), hasBtb(b2b), combo);
                                 //Thread.Sleep(1);
                             }
-
+                            else
+                            {
+                                setLabel8TextSafe("no misdrop");
+                            }
                             //Thread.Sleep(delay);
                         }
                         catch (Exception es)
@@ -493,6 +597,30 @@ namespace tetriobrowser
             {
                 return false;
             }
+        }
+        public static string Print2DArraybool(bool[,] smth)
+        {
+            bool[,] matrix = smth;
+            string lol = "";
+            for (int i = 0; i < 40; i++)
+            {
+                //lol += matrix[i, j] + "\t";
+                for (int j = 0; j < 10; j++)
+                {
+                    if (matrix[i, j])
+                    {
+                        lol += 1;
+
+                    }
+                    else
+                    {
+                        lol += 0;
+                    }
+                }
+                lol += "\n";
+
+            }
+            return lol;
         }
         public static string Print2DArray(string[,] smth)
         {
@@ -643,6 +771,16 @@ namespace tetriobrowser
             }
             return cCPieces;
         }
+        public static CCPiece[] arrToCC2(string[] yea)
+        {
+            CCPiece[] cCPieces = new CCPiece[yea.Length];
+            for (int i = 0; i < yea.Length; i++)
+            {
+                cCPieces[i] = convertStringToCC(yea[i]);
+
+            }
+            return cCPieces;
+        }
         public static void processBag(string bag)
         {
             
@@ -753,7 +891,103 @@ namespace tetriobrowser
 
             }
         }
+        private async Task getPiecesPlacedBot()
+        {
+            if (chromeBrowser.CanExecuteJavascriptInMainFrame)
+            {
+                
+                JavascriptResponse piecesPlaced2 = await chromeBrowser.EvaluateScriptAsync("lol.export().stats.piecesplaced.toString();");
+                if (piecesPlaced2.Result != null)
+                {
+                    //string pieces = piecesPlaced2.Result.ToString();
+                    int piecesplacednum = Int32.Parse(piecesPlaced2.Result.ToString());
+                    botpcplaced = piecesplacednum;
+                }
 
+            }
+        }
+
+        private async Task getCurrentPiece()
+        {
+            if (chromeBrowser.CanExecuteJavascriptInMainFrame)
+            {
+
+                JavascriptResponse curr = await chromeBrowser.EvaluateScriptAsync("currentpiece.type;");
+                if (curr.Result != null)
+                {
+                    //string pieces = piecesPlaced2.Result.ToString();
+                    string currpiece = curr.Result.ToString();
+                    currentpiece = currpiece;
+                }
+
+            }
+        }
+        public static string currentpiece;
+        public static bool overlimit = false;
+        private async Task generatebag()
+        {
+            JavascriptResponse bag = await chromeBrowser.EvaluateScriptAsync("lol.getBag().toString()");
+            if (bag.Result != null)
+            {
+                string jaa = bag.Result.ToString();
+                string[] nextPieces = jaa.Split(',');
+                generatedbag = arrToCC2(nextPieces);
+                
+            }
+           
+        }
+        private async Task overlimitbag()
+        {
+            if (chromeBrowser.CanExecuteJavascriptInMainFrame)
+            {
+                JavascriptResponse bagLength = await chromeBrowser.EvaluateScriptAsync("lol.export().game.bag.toString()");
+                if (bagLength.Result != null)
+                {
+                    string jaa = bagLength.Result.ToString();
+                    string[] nextPieces = jaa.Split(',');
+
+                    if (nextPieces.Length > 20)
+                    {
+                        overlimit = true;
+                        Console.WriteLine("overlimit: " + overlimit + nextPieces.Length);
+                    }
+                    else
+                    {
+                        overlimit = false;
+                    }
+                }
+            }
+        }
+        public static CCPiece[] generatedbag;
+        private async Task getbagrewrite()
+        {
+            if (chromeBrowser.CanExecuteJavascriptInMainFrame)
+            {
+                JavascriptResponse bagLength = await chromeBrowser.EvaluateScriptAsync("lol.export().game.bag.toString()");
+                if (bagLength.Result != null)
+                {
+                    string jaa = bagLength.Result.ToString();
+                    string[] nextPieces = jaa.Split(',');
+                    //int[] ccPieces = new int[nextPieces.Length];
+                    int length = nextPieces.Length;
+                    Task t2 = getCurrentPiece();
+                    t2.Wait();
+                    string[] nextPieces2 = new string[length + 1];
+                    nextPieces2[0] = currentpiece;
+
+                    int i = 1;
+                   foreach(var x in nextPieces)
+                    {
+                        nextPieces2[i] = x;
+                        i++;
+                    }
+                    stringPieces = nextPieces2;
+                    Console.WriteLine("bag: " + string.Join(",", stringPieces));
+                    CCpieces = arrToCC();
+
+                }
+            }
+        }
         private async Task getBag()
         {
             if (chromeBrowser.CanExecuteJavascriptInMainFrame)
@@ -764,8 +998,34 @@ namespace tetriobrowser
                     string jaa = bag.Result.ToString();
                     string[] nextPieces = jaa.Split(',');
                     //int[] ccPieces = new int[nextPieces.Length];
-                    stringPieces = nextPieces;
+                    Task t2 = getCurrentPiece();
+                    t2.Wait();
+                    int i = 0;
+                    int length = nextPieces.Length;
+                    string[] nextPieces2;
+                    //string[] nextPieces3;
+                    foreach (var x in nextPieces)
+                    {
+                        if(x == currentpiece)
+                        {
+                            nextPieces2 = new string[length-i];
+                            int l = 0;
+                            for(int j = i; j < length; j++)
+                            {
+                                nextPieces2[l] = nextPieces[j];
+                                l++;
+                            }
+                            //nextPieces2[0] = nextPieces[i];
+                            stringPieces = nextPieces2;
+
+                            break;
+                        }
+                        i++;
+                    }
+
+                    
                     Console.WriteLine("bag: " + string.Join(",", stringPieces));
+                    Console.WriteLine("currentpiece: " + currentpiece);
 
                     CCpieces = arrToCC();
 
@@ -894,7 +1154,9 @@ namespace tetriobrowser
 
         private void timer1_Tick(object sender, EventArgs e)
         {
-            //getData();
+            Task upcomingTsk = getUpcoming();
+            upcomingTsk.Wait();
+            Thread.Sleep(2);
 
         }
 

@@ -16,7 +16,7 @@ namespace tetriobrowser
         {
             InitializeComponent();
             this.TopMost = true;
-            this.Opacity = .6;
+            this.Opacity = .4;
             //this.BackColor = Color.Turquoise;
 
              this.TransparencyKey = BackColor;
